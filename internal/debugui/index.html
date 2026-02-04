@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MCP Sandbox Debug</title>
+    <style>
+      body { font-family: system-ui, -apple-system, sans-serif; margin: 16px; }
+      textarea { width: 100%; height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      pre { background: #111; color: #eee; padding: 12px; overflow: auto; max-height: 320px; }
+      .row { display: flex; gap: 12px; }
+      .col { flex: 1; }
+      label { display: block; margin: 8px 0 4px; font-weight: 600; }
+      button { padding: 8px 12px; }
+      input { width: 100%; padding: 6px; }
+      small { color: #444; }
+    </style>
+  </head>
+  <body>
+    <h1>MCP Sandbox Debug UI</h1>
+    <p><small>Calls <code>POST /mcp</code> and streams <code>/mcp/events</code>.</small></p>
+
+    <label>Tool Preset</label>
+    <select id="tool"></select>
+    <small id="toolhint"></small>
+
+    <div class="row">
+      <div class="col">
+        <label>JSON-RPC request body</label>
+        <textarea id="req"></textarea>
+        <button id="send">Send</button>
+        <label>curl (POST)</label>
+        <pre id="curlpost"></pre>
+      </div>
+      <div class="col">
+        <label>Response</label>
+        <pre id="resp"></pre>
+      </div>
+    </div>
+
+    <h2>SSE Viewer</h2>
+    <label>Run ID</label>
+    <input id="runid" placeholder="paste run_id" />
+    <button id="connect">Connect</button>
+    <button id="disconnect">Disconnect</button>
+    <label>curl (SSE)</label>
+    <pre id="curlsse"></pre>
+    <label>curl (status)</label>
+    <pre id="curlstatus"></pre>
+    <pre id="events"></pre>
+
+    <script>
+      const reqEl = document.getElementById('req');
+      const respEl = document.getElementById('resp');
+      const eventsEl = document.getElementById('events');
+      const runIdEl = document.getElementById('runid');
+      const toolEl = document.getElementById('tool');
+      const toolHintEl = document.getElementById('toolhint');
+      const curlPostEl = document.getElementById('curlpost');
+      const curlSseEl = document.getElementById('curlsse');
+      const curlStatusEl = document.getElementById('curlstatus');
+
+      const MCP_PATH = '__MCP_PATH__';
+
+      let toolSchemas = {};
+
+      function curlHeredoc(cmd, jsonText) {
+        return `${cmd} \\\n  -H 'content-type: application/json' \\\n  --data @- <<'JSON'\n${jsonText}\nJSON`;
+      }
+
+      function updateCurlSnippets() {
+        const origin = window.location.origin;
+        const postURL = origin + MCP_PATH;
+        const jsonText = reqEl.value.trim() || '{}';
+        curlPostEl.textContent = curlHeredoc(`curl -sS -X POST '${postURL}'`, jsonText);
+
+        const runId = runIdEl.value.trim();
+        if (runId) {
+          curlSseEl.textContent = `curl -N '${origin}${MCP_PATH}/events?run_id=${encodeURIComponent(runId)}'`;
+          curlStatusEl.textContent = `curl -sS '${origin}${MCP_PATH}/runs/${encodeURIComponent(runId)}' | jq .`;
+        } else {
+          curlSseEl.textContent = "# Enter a run_id above";
+          curlStatusEl.textContent = "# Enter a run_id above";
+        }
+      }
+
+      function setRequest(obj) {
+        reqEl.value = JSON.stringify(obj, null, 2);
+        updateCurlSnippets();
+      }
+
+      function prettifyMaybeJSON(text) {
+        try {
+          return JSON.stringify(JSON.parse(text), null, 2);
+        } catch {
+          return text;
+        }
+      }
+
+      function schemaExample(schema) {
+        if (!schema || typeof schema !== 'object') return {};
+
+        // Custom examples for our core tools.
+        if (schema?.properties?.identifier && schema?.properties?.commands) {
+          return {
+            identifier: 'demo',
+            commands: [{ shell: 'echo hello from sandbox' }],
+            options: { await_completion: true, await_timeout_ms: 60000 }
+          };
+        }
+
+        if (schema.type === 'object') {
+          const out = {};
+          const props = schema.properties || {};
+          const required = new Set(schema.required || []);
+          for (const [k, v] of Object.entries(props)) {
+            if (!required.has(k)) continue;
+            out[k] = schemaExample(v);
+          }
+          return out;
+        }
+
+        if (schema.type === 'array') {
+          const item = schemaExample(schema.items);
+          return item && Object.keys(item).length ? [item] : [];
+        }
+
+        switch (schema.type) {
+          case 'string':
+            if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum[0];
+            return '';
+          case 'integer':
+          case 'number':
+            return 0;
+          case 'boolean':
+            return false;
+          default:
+            return null;
+        }
+      }
+
+      reqEl.addEventListener('input', updateCurlSnippets);
+      runIdEl.addEventListener('input', updateCurlSnippets);
+
+      function updateFromToolPreset() {
+        const v = toolEl.value;
+        if (v === 'tools/list') {
+          toolHintEl.textContent = 'Lists available tools and schemas.';
+          setRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} });
+          return;
+        }
+
+        const schema = toolSchemas[v];
+        toolHintEl.textContent = schema?.description || '';
+
+        setRequest({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: v,
+            arguments: schemaExample(schema?.inputSchema)
+          }
+        });
+      }
+
+      async function loadTools() {
+        toolEl.innerHTML = '';
+        toolSchemas = {};
+
+        const optList = document.createElement('option');
+        optList.value = 'tools/list';
+        optList.textContent = 'tools/list';
+        toolEl.appendChild(optList);
+
+        try {
+          const res = await fetch(MCP_PATH, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })
+          });
+          const obj = await res.json();
+          const tools = obj?.result?.tools || [];
+
+          for (const t of tools) {
+            const o = document.createElement('option');
+            o.value = t.name;
+            o.textContent = `tools/call: ${t.name}`;
+            toolEl.appendChild(o);
+            toolSchemas[t.name] = t;
+          }
+        } catch (e) {
+          toolHintEl.textContent = `Failed to load tools: ${String(e)}`;
+        }
+
+        updateFromToolPreset();
+      }
+
+      toolEl.addEventListener('change', updateFromToolPreset);
+
+      async function send() {
+        updateCurlSnippets();
+        respEl.textContent = 'Sending...';
+        try {
+          const res = await fetch(MCP_PATH, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: reqEl.value
+          });
+          const text = await res.text();
+          respEl.textContent = prettifyMaybeJSON(text);
+
+          try {
+            const obj = JSON.parse(text);
+            const runId = obj?.result?.structuredContent?.run_id || obj?.result?.run_id;
+            if (runId) {
+              runIdEl.value = runId;
+              updateCurlSnippets();
+            }
+          } catch {}
+        } catch (e) {
+          respEl.textContent = String(e);
+        }
+      }
+
+      document.getElementById('send').addEventListener('click', send);
+
+      loadTools();
+      updateCurlSnippets();
+
+      let es = null;
+      function connect() {
+        updateCurlSnippets();
+        const runId = runIdEl.value.trim();
+        if (!runId) return;
+        if (es) es.close();
+        eventsEl.textContent = '';
+
+        es = new EventSource(`${MCP_PATH}/events?run_id=${encodeURIComponent(runId)}`);
+        const append = (label, data) => {
+          eventsEl.textContent += `${label}: ${data}\n`;
+          eventsEl.scrollTop = eventsEl.scrollHeight;
+        };
+        es.onmessage = (ev) => append('message', ev.data);
+        es.onerror = (ev) => append('error', 'SSE error / disconnected');
+
+        const eventTypes = [
+          'run_started','command_started','command_stdout','command_stderr',
+          'command_finished','run_finished','run_failed','heartbeat'
+        ];
+        for (const t of eventTypes) {
+          es.addEventListener(t, (ev) => append(t, ev.data));
+        }
+      }
+
+      function disconnect() {
+        if (es) {
+          es.close();
+          es = null;
+        }
+      }
+
+      document.getElementById('connect').addEventListener('click', connect);
+      document.getElementById('disconnect').addEventListener('click', disconnect);
+    </script>
+  </body>
+</html>
