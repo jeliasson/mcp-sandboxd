@@ -17,11 +17,26 @@ func TestValidateRunArgs(t *testing.T) {
 	}
 
 	ok := RunSandboxArgs{
-		Identifier: "abc",
+		Identifier: "Abc_123-x",
 		Commands:   []CommandInput{{Shell: OptionalString{Value: "echo hi", Set: true}}},
 	}
 	if err := validateRunArgs(ok); err != nil {
 		t.Fatalf("expected ok, got %v", err)
+	}
+
+	bad := []RunSandboxArgs{
+		{Identifier: "../foo", Commands: []CommandInput{{Shell: OptionalString{Value: "echo hi", Set: true}}}},
+		{Identifier: "..", Commands: []CommandInput{{Shell: OptionalString{Value: "echo hi", Set: true}}}},
+		{Identifier: "a/b", Commands: []CommandInput{{Shell: OptionalString{Value: "echo hi", Set: true}}}},
+		{Identifier: "a\\b", Commands: []CommandInput{{Shell: OptionalString{Value: "echo hi", Set: true}}}},
+		{Identifier: "with space", Commands: []CommandInput{{Shell: OptionalString{Value: "echo hi", Set: true}}}},
+		{Identifier: "a.b", Commands: []CommandInput{{Shell: OptionalString{Value: "echo hi", Set: true}}}},
+		{Identifier: "", Commands: []CommandInput{{Shell: OptionalString{Value: "echo hi", Set: true}}}},
+	}
+	for _, tc := range bad {
+		if err := validateRunArgs(tc); err == nil {
+			t.Fatalf("expected validation error for %q", tc.Identifier)
+		}
 	}
 
 	compat := RunSandboxArgs{Identifier: "abc", Commands: []CommandInput{{Shell: OptionalString{Value: "/bin/bash", Set: true}, Argv: []string{"ls"}, Env: EnvVars{}, TimeoutMS: 1}}, Options: RunOptions{AwaitCompletion: func() *bool { b := true; return &b }()}}

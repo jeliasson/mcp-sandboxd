@@ -468,10 +468,39 @@ func (m *Manager) checkDenylist(text string) error {
 	return nil
 }
 
-func validateRunArgs(args RunSandboxArgs) error {
-	if args.Identifier == "" || len(args.Identifier) > 256 {
-		return errors.New("identifier must be non-empty and <= 256 chars")
+const maxIdentifierLen = 36
+
+var identifierRe = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,36}$`)
+
+func safeJoinUnderRoot(root string, elems ...string) (string, error) {
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
 	}
+
+	full := absRoot
+	for _, e := range elems {
+		full = filepath.Join(full, e)
+	}
+	absFull, err := filepath.Abs(full)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(absRoot, absFull)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path escapes artifacts root")
+	}
+	return absFull, nil
+}
+
+func validateRunArgs(args RunSandboxArgs) error {
+	if !identifierRe.MatchString(args.Identifier) {
+		return fmt.Errorf("identifier must match ^[a-zA-Z0-9_-]{1,%d}$", maxIdentifierLen)
+	}
+
 	if len(args.Commands) == 0 {
 		return errors.New("commands must be non-empty")
 	}
@@ -609,7 +638,14 @@ func (m *Manager) extractArtifacts(runID string, sbx *sandbox.Sandbox, b *sse.Br
 	run := m.runs[runID]
 	m.mu.Unlock()
 
-	dest := filepath.Join(m.cfg.ArtifactsDir, run.Identifier, runID)
+	dest, err := safeJoinUnderRoot(m.cfg.ArtifactsDir, run.Identifier, runID)
+	if err != nil {
+		m.mu.Lock()
+		run.ArtifactsError = err.Error()
+		m.mu.Unlock()
+		return
+	}
+
 	_ = os.RemoveAll(dest)
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		m.mu.Lock()

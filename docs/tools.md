@@ -9,6 +9,7 @@ Source of truth: `internal/mcp/tools.go`.
 Run one or more commands in a sandbox keyed by `identifier`.
 
 Notes:
+- `identifier` must match `^[a-zA-Z0-9_-]{1,36}$`.
 - Each command should provide exactly one of `shell` (string) or `argv` (string array). (This constraint is described in the tool description but not enforced by the JSON schema.)
 - `env` supports either an object map (`{"KEY":"VALUE"}`) or an array of `KEY=VALUE` strings.
 
@@ -18,7 +19,7 @@ Notes:
 {
   "type": "object",
   "properties": {
-    "identifier": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 36, "pattern": "^[a-zA-Z0-9_-]{1,36}$" },
     "commands": {
       "type": "array",
       "minItems": 1,
@@ -76,7 +77,7 @@ Delete a sandbox environment.
 {
   "type": "object",
   "properties": {
-    "identifier": { "type": "string", "minLength": 1, "maxLength": 256 }
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 36, "pattern": "^[a-zA-Z0-9_-]{1,36}$" }
   },
   "required": ["identifier"]
 }
@@ -92,7 +93,7 @@ Recreate a fresh sandbox for an identifier.
 {
   "type": "object",
   "properties": {
-    "identifier": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 36, "pattern": "^[a-zA-Z0-9_-]{1,36}$" },
     "options": {
       "type": "object",
       "properties": {
