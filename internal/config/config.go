@@ -95,20 +95,9 @@ func Load() (Config, error) {
 	if cfg.SandboxBackend != "docker" && cfg.SandboxBackend != "kubernetes" {
 		return Config{}, fmt.Errorf("SANDBOX_BACKEND must be docker or kubernetes, got %q", cfg.SandboxBackend)
 	}
-	cfg.KubernetesSandboxNamespace = strings.TrimSpace(envString("KUBERNETES_SANDBOX_NAMESPACE", ""))
-	if cfg.KubernetesSandboxNamespace == "" {
-		// Backward-compat: previous prefix.
-		cfg.KubernetesSandboxNamespace = strings.TrimSpace(envString("K8S_SANDBOX_NAMESPACE", ""))
-	}
 
-	cfg.KubernetesSandboxContainerName = strings.TrimSpace(envString("KUBERNETES_SANDBOX_CONTAINER_NAME", ""))
-	if cfg.KubernetesSandboxContainerName == "" {
-		// Backward-compat: previous prefix.
-		cfg.KubernetesSandboxContainerName = strings.TrimSpace(envString("K8S_SANDBOX_CONTAINER_NAME", "sandbox"))
-	}
-	if cfg.KubernetesSandboxContainerName == "" {
-		cfg.KubernetesSandboxContainerName = "sandbox"
-	}
+	cfg.KubernetesSandboxNamespace = strings.TrimSpace(envString("KUBERNETES_SANDBOX_NAMESPACE", ""))
+	cfg.KubernetesSandboxContainerName = strings.TrimSpace(envString("KUBERNETES_SANDBOX_CONTAINER_NAME", "sandbox"))
 
 	cfg.ArtifactsDir = envString("ARTIFACTS_DIR", "./data/artifacts")
 

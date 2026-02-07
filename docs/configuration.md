@@ -31,9 +31,6 @@ Related docs:
 - `KUBERNETES_SANDBOX_NAMESPACE` (optional): namespace where sandbox Pods are created (defaults to the server namespace).
 - `KUBERNETES_SANDBOX_CONTAINER_NAME` (default `sandbox`): container name inside sandbox Pods.
 
-Backward compatibility:
-- `K8S_SANDBOX_NAMESPACE` and `K8S_SANDBOX_CONTAINER_NAME` are still accepted, but deprecated.
-
 ## Sandbox policy (Docker backend)
 
 These settings affect how sandbox containers are created. Changing them triggers sandbox recreation.
