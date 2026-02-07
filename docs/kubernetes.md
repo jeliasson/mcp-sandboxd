@@ -1,28 +1,23 @@
 # Kubernetes
 
-## Contents
-
-- [Kubernetes-native backend](#kubernetes-native-backend)
-- [DinD sidecar (Docker backend)](#dind-sidecar-docker-backend)
+The Kubernetes backend manages one long-running sandbox Pod per `identifier`.
 
 `mcp-sandboxd` supports two Kubernetes deployment patterns:
 
-- **Kubernetes-native backend**: the server schedules sandbox Pods via the Kubernetes API.
-- **DinD sidecar (Docker backend)**: the server talks to a Docker daemon provided by a privileged `docker:dind` sidecar.
-
-Images:
-- Server: `ghcr.io/jeliasson/mcp-sandboxd:latest`
-- Sandbox: `ghcr.io/jeliasson/mcp-sandboxd-sandbox:latest`
+- [Kubernetes Pod](#kubernetes-pod): the server schedules sandbox Pods via the Kubernetes API.
+- [DinD sidecar](#dind-sidecar): the server talks to a Docker daemon provided by a privileged `docker:dind` sidecar.
 
 Related docs:
 - [Configuration](configuration.md)
-- [Docker backend](docker.md)
+- [Images](images.md)
+- [Docker](docker.md)
 
-## Kubernetes-native backend
+## Kubernetes-pod
 
 In this mode, `mcp-sandboxd` schedules sandbox Pods via the Kubernetes API.
 
 - Set `SANDBOX_BACKEND=kubernetes`.
+- Set `SANDBOX_IMAGE` to the sandbox image you want to run.
 - The server uses its ServiceAccount credentials to create Pods.
 - Each `identifier` maps to one long-running sandbox Pod (persistent for the chat/session).
 
@@ -136,9 +131,9 @@ spec:
 - Apply a default-deny egress NetworkPolicy for the sandbox namespace.
 - Use ResourceQuota/LimitRange to cap CPU/memory/ephemeral storage.
 
-## DinD sidecar (Docker backend)
+## DinD sidecar
 
-Most clusters run `containerd` on nodes, so there is no Docker daemon available by default. This pattern provides a Docker daemon via DinD.
+Most clusters run `containerd` on nodes, so there is no Docker daemon available by default. This pattern provides a **Docker daemon** via DinD.
 
 Security notes:
 - DinD generally requires `securityContext.privileged: true`.

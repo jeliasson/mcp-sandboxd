@@ -35,12 +35,12 @@ Related docs:
 
 ## Backends
 
-**Docker backend**
+**Docker**
 - Manages long-running containers per identifier.
 - Executes commands using Docker exec.
 - Extracts `/artifacts` using Docker `CopyFromContainer`.
 
-**Kubernetes backend**
+**Kubernetes**
 - Manages long-running Pods per identifier.
 - Executes commands using Kubernetes `pods/exec` streaming.
 - Extracts `/artifacts` by streaming a `tar` archive from inside the Pod.
