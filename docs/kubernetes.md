@@ -130,6 +130,7 @@ spec:
 - Use a dedicated namespace for sandboxes.
 - Apply a default-deny egress NetworkPolicy for the sandbox namespace.
 - Use ResourceQuota/LimitRange to cap CPU/memory/ephemeral storage.
+- Tune Linux capabilities via `SANDBOX_CAP_DROP` / `SANDBOX_CAP_ADD`.
 
 ## DinD sidecar
 
