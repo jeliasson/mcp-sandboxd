@@ -61,6 +61,7 @@ type Config struct {
 	SandboxBackend                 string
 	KubernetesSandboxNamespace     string
 	KubernetesSandboxContainerName string
+	KubernetesSandboxLabelPrefix   string
 
 	ToolDescOverridesEnabled       bool
 	ToolDescRunSandboxOverride     string
@@ -98,6 +99,10 @@ func Load() (Config, error) {
 
 	cfg.KubernetesSandboxNamespace = strings.TrimSpace(envString("KUBERNETES_SANDBOX_NAMESPACE", ""))
 	cfg.KubernetesSandboxContainerName = strings.TrimSpace(envString("KUBERNETES_SANDBOX_CONTAINER_NAME", "sandbox"))
+	cfg.KubernetesSandboxLabelPrefix = strings.TrimSpace(envString("KUBERNETES_SANDBOX_LABEL_PREFIX", "mcp-sandboxd.jeliasson.dev"))
+	if cfg.KubernetesSandboxLabelPrefix == "" {
+		return Config{}, errors.New("KUBERNETES_SANDBOX_LABEL_PREFIX must not be empty")
+	}
 
 	cfg.ArtifactsDir = envString("ARTIFACTS_DIR", "./data/artifacts")
 

@@ -12,7 +12,7 @@ Related docs:
 - [Images](images.md)
 - [Docker](docker.md)
 
-## Kubernetes-pod
+## Kubernetes Pod
 
 In this mode, `mcp-sandboxd` schedules sandbox Pods via the Kubernetes API.
 
