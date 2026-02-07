@@ -1,7 +1,10 @@
 FROM ubuntu:24.04
 
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
 RUN apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+  && apt-get install -y --no-install-recommends \
     bash coreutils ca-certificates tar util-linux \
   && rm -rf /var/lib/apt/lists/*
 
