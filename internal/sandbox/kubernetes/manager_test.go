@@ -24,6 +24,7 @@ func TestManagerEnsureCreatesAndReusesPod(t *testing.T) {
 		SandboxNoNewPrivileges:         true,
 		SandboxCapDrop:                 []string{"ALL"},
 		SandboxCapAdd:                  []string{"SETUID"},
+		KubernetesSandboxLabelPrefix:   "mcp-sandboxd.jeliasson.dev",
 	}
 
 	mgr, err := NewManager(cfg, cs)
@@ -68,6 +69,7 @@ func TestManagerPolicyMismatchRecreates(t *testing.T) {
 		SandboxNoNewPrivileges:         true,
 		SandboxCapDrop:                 []string{"ALL"},
 		SandboxCapAdd:                  []string{"SETUID"},
+		KubernetesSandboxLabelPrefix:   "mcp-sandboxd.jeliasson.dev",
 	}
 
 	mgr, err := NewManager(cfg, cs)
@@ -82,11 +84,10 @@ func TestManagerPolicyMismatchRecreates(t *testing.T) {
 			Name:      name,
 			Namespace: "sandboxes",
 			Labels: map[string]string{
-				"mcp.role":               "sandbox",
-				"mcp.identifier":         "chat1",
-				"mcp.policy_fingerprint": "bad",
-				"mcp.expires_at_unix_ms": "9999999999999",
-				"mcp.image":              cfg.SandboxImage,
+				mgr.labelKey("role"):               "sandbox",
+				mgr.labelKey("identifier"):         "chat1",
+				mgr.labelKey("policy-fingerprint"): "bad",
+				mgr.labelKey("expires-at-unix-ms"): "9999999999999",
 			},
 		},
 		Spec:   corev1.PodSpec{Containers: []corev1.Container{{Name: "sandbox", Image: cfg.SandboxImage}}},
@@ -104,7 +105,7 @@ func TestManagerPolicyMismatchRecreates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get pod: %v", err)
 	}
-	if p.Labels["mcp.policy_fingerprint"] == "bad" {
+	if p.Labels[mgr.labelKey("policy-fingerprint")] == "bad" {
 		t.Fatalf("expected fingerprint to be updated")
 	}
 }

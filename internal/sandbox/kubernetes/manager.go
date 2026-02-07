@@ -59,6 +59,10 @@ func currentNamespace() string {
 	return strings.TrimSpace(string(b))
 }
 
+func (m *Manager) labelKey(name string) string {
+	return m.cfg.KubernetesSandboxLabelPrefix + "/" + name
+}
+
 func (m *Manager) Count() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -144,7 +148,7 @@ func (m *Manager) Restart(ctx context.Context, identifier string, ttlSeconds int
 }
 
 func (m *Manager) ReapOnce(ctx context.Context) (int, error) {
-	pods, err := m.client.CoreV1().Pods(m.namespace).List(ctx, metav1.ListOptions{LabelSelector: "mcp.role=sandbox"})
+	pods, err := m.client.CoreV1().Pods(m.namespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=sandbox", m.labelKey("role"))})
 	if err != nil {
 		return 0, err
 	}
@@ -152,7 +156,7 @@ func (m *Manager) ReapOnce(ctx context.Context) (int, error) {
 	now := time.Now().UTC()
 	count := 0
 	for _, p := range pods.Items {
-		identifier := p.Labels["mcp.identifier"]
+		identifier := p.Labels[m.labelKey("identifier")]
 		if identifier == "" {
 			continue
 		}
@@ -164,7 +168,7 @@ func (m *Manager) ReapOnce(ctx context.Context) (int, error) {
 		}
 		m.mu.Unlock()
 		if expiresAt.IsZero() {
-			if ms, ok := p.Labels["mcp.expires_at_unix_ms"]; ok {
+			if ms, ok := p.Labels[m.labelKey("expires-at-unix-ms")]; ok {
 				if v, parseErr := parseInt64(ms); parseErr == nil {
 					expiresAt = time.UnixMilli(v).UTC()
 				}
@@ -231,12 +235,11 @@ func (m *Manager) create(ctx context.Context, identifier string, ttlSeconds int)
 	name := podName(identifier)
 
 	labels := map[string]string{
-		"mcp.role":               "sandbox",
-		"mcp.identifier":         identifier,
-		"mcp.created_at_unix_ms": fmt.Sprintf("%d", now.UnixMilli()),
-		"mcp.expires_at_unix_ms": fmt.Sprintf("%d", expires.UnixMilli()),
-		"mcp.image":              m.cfg.SandboxImage,
-		"mcp.policy_fingerprint": m.policyFingerprint(),
+		m.labelKey("role"):               "sandbox",
+		m.labelKey("identifier"):         identifier,
+		m.labelKey("created-at-unix-ms"): fmt.Sprintf("%d", now.UnixMilli()),
+		m.labelKey("expires-at-unix-ms"): fmt.Sprintf("%d", expires.UnixMilli()),
+		m.labelKey("policy-fingerprint"): m.policyFingerprint(),
 	}
 
 	falseVal := false
@@ -299,7 +302,7 @@ func (m *Manager) create(ctx context.Context, identifier string, ttlSeconds int)
 }
 
 func (m *Manager) findByIdentifier(ctx context.Context, identifier string) (*sandbox.Sandbox, error) {
-	selector := fmt.Sprintf("mcp.role=sandbox,mcp.identifier=%s", identifier)
+	selector := fmt.Sprintf("%s=sandbox,%s=%s", m.labelKey("role"), m.labelKey("identifier"), identifier)
 	pods, err := m.client.CoreV1().Pods(m.namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, err
@@ -310,7 +313,7 @@ func (m *Manager) findByIdentifier(ctx context.Context, identifier string) (*san
 
 	p := pods.Items[0]
 	expected := m.policyFingerprint()
-	actual := p.Labels["mcp.policy_fingerprint"]
+	actual := p.Labels[m.labelKey("policy-fingerprint")]
 	if actual != expected {
 		log.Printf(
 			"sandbox policy mismatch; recreating: identifier=%s pod=%s expected=%s actual=%s",
@@ -330,7 +333,7 @@ func (m *Manager) findByIdentifier(ctx context.Context, identifier string) (*san
 
 	createdAt := p.CreationTimestamp.Time.UTC()
 	expiresAt := createdAt.Add(time.Duration(m.cfg.DefaultTTLSeconds) * time.Second)
-	if v, ok := p.Labels["mcp.expires_at_unix_ms"]; ok {
+	if v, ok := p.Labels[m.labelKey("expires-at-unix-ms")]; ok {
 		if ms, parseErr := parseInt64(v); parseErr == nil {
 			expiresAt = time.UnixMilli(ms).UTC()
 		}
@@ -342,7 +345,7 @@ func (m *Manager) findByIdentifier(ctx context.Context, identifier string) (*san
 		Name:        p.Name,
 		CreatedAt:   createdAt,
 		ExpiresAt:   expiresAt,
-		Image:       p.Labels["mcp.image"],
+		Image:       m.cfg.SandboxImage,
 	}, nil
 }
 
