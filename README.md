@@ -124,6 +124,7 @@ Starts `mcp-sandboxd` on `http://localhost:8080/mcp`.
 **General**
 - [Architecture](docs/architecture.md): Protocol surface and internals.
 - [Configuration](docs/configuration.md): Environment variables and defaults.
+- [Images](docs/images.md): Published container images and tags.
 - [Observability](docs/observability.md): Prometheus metrics.
 - [Tools](docs/tools.md): Tool schemas and parameters.
 
