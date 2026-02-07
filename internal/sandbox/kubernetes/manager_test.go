@@ -56,6 +56,74 @@ func TestManagerEnsureCreatesAndReusesPod(t *testing.T) {
 	}
 }
 
+func TestManagerPodSecurityContextMirrorsSandboxConfig(t *testing.T) {
+	cs := fake.NewSimpleClientset()
+
+	cfg := config.Config{
+		SandboxImage:                   "example:sandbox",
+		DefaultTTLSeconds:              60,
+		MaxTTLSeconds:                  60,
+		KubernetesSandboxNamespace:     "sandboxes",
+		KubernetesSandboxContainerName: "sandbox",
+		SandboxNoNewPrivileges:         true,
+		SandboxCapDrop:                 []string{"ALL"},
+		SandboxCapAdd:                  []string{"SETUID", "NET_RAW"},
+		KubernetesSandboxLabelPrefix:   "mcp-sandboxd.jeliasson.dev",
+	}
+
+	mgr, err := NewManager(cfg, cs)
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+
+	ctx := context.Background()
+	s, err := mgr.Ensure(ctx, "chat1", 30)
+	if err != nil {
+		t.Fatalf("Ensure: %v", err)
+	}
+
+	p, err := cs.CoreV1().Pods("sandboxes").Get(ctx, s.ContainerID, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("get pod: %v", err)
+	}
+	if len(p.Spec.Containers) != 1 {
+		t.Fatalf("expected 1 container, got %d", len(p.Spec.Containers))
+	}
+
+	sc := p.Spec.Containers[0].SecurityContext
+	if sc == nil {
+		t.Fatalf("expected securityContext")
+	}
+	if sc.Capabilities == nil {
+		t.Fatalf("expected capabilities")
+	}
+
+	haveDrop := map[string]bool{}
+	for _, c := range sc.Capabilities.Drop {
+		haveDrop[string(c)] = true
+	}
+	if !haveDrop["ALL"] {
+		t.Fatalf("expected capabilities.drop to include ALL, got %#v", sc.Capabilities.Drop)
+	}
+
+	haveAdd := map[string]bool{}
+	for _, c := range sc.Capabilities.Add {
+		haveAdd[string(c)] = true
+	}
+	for _, expected := range []string{"SETUID", "NET_RAW"} {
+		if !haveAdd[expected] {
+			t.Fatalf("expected capabilities.add to include %s, got %#v", expected, sc.Capabilities.Add)
+		}
+	}
+
+	if sc.AllowPrivilegeEscalation == nil || *sc.AllowPrivilegeEscalation {
+		t.Fatalf("expected allowPrivilegeEscalation=false, got %#v", sc.AllowPrivilegeEscalation)
+	}
+	if sc.SeccompProfile == nil || sc.SeccompProfile.Type != corev1.SeccompProfileTypeRuntimeDefault {
+		t.Fatalf("expected seccompProfile RuntimeDefault, got %#v", sc.SeccompProfile)
+	}
+}
+
 func TestManagerPolicyMismatchRecreates(t *testing.T) {
 	cs := fake.NewSimpleClientset()
 

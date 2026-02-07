@@ -244,6 +244,10 @@ func (m *Manager) create(ctx context.Context, identifier string, ttlSeconds int)
 
 	falseVal := false
 	rootUID := int64(0)
+
+	capDrop := append([]corev1.Capability{}, toKubernetesCaps(m.cfg.SandboxCapDrop)...)
+	capAdd := append([]corev1.Capability{}, toKubernetesCaps(m.cfg.SandboxCapAdd)...)
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -261,8 +265,14 @@ func (m *Manager) create(ctx context.Context, identifier string, ttlSeconds int)
 					WorkingDir: "/workspace",
 					Command:    []string{"sleep", "infinity"},
 					SecurityContext: &corev1.SecurityContext{
-						RunAsUser:  &rootUID,
-						RunAsGroup: &rootUID,
+						RunAsUser:                &rootUID,
+						RunAsGroup:               &rootUID,
+						AllowPrivilegeEscalation: ptrBool(!m.cfg.SandboxNoNewPrivileges),
+						Capabilities: &corev1.Capabilities{
+							Drop: capDrop,
+							Add:  capAdd,
+						},
+						SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "workspace", MountPath: "/workspace"},
@@ -380,8 +390,7 @@ func (m *Manager) policyFingerprint() string {
 	sort.Strings(capDrop)
 
 	data := fmt.Sprintf(
-		"network=%s;nnp=%t;cap_add=%s;cap_drop=%s",
-		m.cfg.SandboxNetworkMode,
+		"nnp=%t;cap_add=%s;cap_drop=%s",
 		m.cfg.SandboxNoNewPrivileges,
 		strings.Join(capAdd, ","),
 		strings.Join(capDrop, ","),
@@ -401,6 +410,20 @@ func parseInt64(v string) (int64, error) {
 }
 
 func ptrInt64(v int64) *int64 { return &v }
+
+func ptrBool(v bool) *bool { return &v }
+
+func toKubernetesCaps(caps []string) []corev1.Capability {
+	out := make([]corev1.Capability, 0, len(caps))
+	for _, capName := range caps {
+		capName = strings.TrimSpace(capName)
+		if capName == "" {
+			continue
+		}
+		out = append(out, corev1.Capability(capName))
+	}
+	return out
+}
 
 func init() {
 	// Ensure the namespace file can be read in initContainers or rootless envs.
