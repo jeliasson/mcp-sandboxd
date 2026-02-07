@@ -6,8 +6,9 @@ If you prefer, copy `.env.example` to `.env` and tweak.
 
 Related docs:
 - [Development](development.md)
-- [Docker backend](docker.md)
+- [Docker](docker.md)
 - [Kubernetes](kubernetes.md)
+- [Images](images.md)
 
 ## General
 
@@ -20,27 +21,26 @@ Related docs:
 - `SANDBOX_BACKEND` (default `docker`): `docker` or `kubernetes`.
 - `SANDBOX_IMAGE` (required): sandbox image reference (used by both backends).
 
+### Image tags
+
+See [Container images](images.md) for the published image references and tag scheme.
+
 ## Docker backend
 
 - `DOCKER_HOST` (optional): docker/podman socket or daemon endpoint.
 - `AUTO_BUILD_SANDBOX_IMAGE` (default `true`): build sandbox image if missing.
 - `SANDBOX_DOCKERFILE_PATH` (default `docker/sandbox.Dockerfile`): Dockerfile to build sandbox image.
-
-## Kubernetes backend
-
-- `KUBERNETES_SANDBOX_NAMESPACE` (optional): namespace where sandbox Pods are created (defaults to the server namespace).
-- `KUBERNETES_SANDBOX_CONTAINER_NAME` (default `sandbox`): container name inside sandbox Pods.
-
-## Sandbox policy (Docker backend)
-
-These settings affect how sandbox containers are created. Changing them triggers sandbox recreation.
-
 - `SANDBOX_NETWORK_MODE` (default `bridge`)
 - `SANDBOX_NO_NEW_PRIVILEGES` (default `true`)
 - `SANDBOX_CAP_DROP` (default `ALL`)
 - `SANDBOX_CAP_ADD` (default `SETUID,SETGID,CHOWN,FOWNER,DAC_OVERRIDE`)
 - `SANDBOX_CAPS_STRICT` (default `true`)
 - `SANDBOX_CAPS_BYPASS_CHECK` (default `false`)
+
+## Kubernetes backend
+
+- `KUBERNETES_SANDBOX_NAMESPACE` (optional): namespace where sandbox Pods are created (defaults to the server namespace).
+- `KUBERNETES_SANDBOX_CONTAINER_NAME` (default `sandbox`): container name inside sandbox Pods.
 
 ## Tool description overrides
 
