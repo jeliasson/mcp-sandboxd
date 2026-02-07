@@ -1,0 +1,23 @@
+name: Development
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test
+    uses: ./.github/workflows/_test.yml
+
+  build:
+    name: Build
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/_build.yml
+    with:
+      tags: |
+        type=raw,value=${{ needs.test.outputs.short_sha }}-dev

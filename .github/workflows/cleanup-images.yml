@@ -1,0 +1,128 @@
+name: cleanup-images
+
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no deletions)"
+        required: true
+        default: true
+        type: boolean
+
+env:
+  OWNER: ${{ github.repository_owner }}
+  PACKAGES: "mcp-sandboxd mcp-sandboxd-sandbox"
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Decide dry-run mode
+        id: dry
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "dry_run=${{ inputs.dry_run }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cleanup old GHCR images
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ steps.dry.outputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          owner="${OWNER}"
+          keep_count=10
+
+          echo "Dry-run: ${DRY_RUN}"
+
+          list_versions() {
+            local package="$1"
+            local page=1
+            while :; do
+              local body
+              body=$(gh api -H "Accept: application/vnd.github+json" \
+                "/users/${owner}/packages/container/${package}/versions?per_page=100&page=${page}")
+
+              if [ "$(echo "${body}" | jq 'length')" -eq 0 ]; then
+                break
+              fi
+
+              echo "${body}"
+              page=$((page + 1))
+            done
+          }
+
+          delete_version() {
+            local package="$1"
+            local version_id="$2"
+
+            if [ "${DRY_RUN}" = "true" ]; then
+              echo "DRY_RUN: would delete ${package} version_id=${version_id}"
+              return 0
+            fi
+
+            gh api -X DELETE -H "Accept: application/vnd.github+json" \
+              "/users/${owner}/packages/container/${package}/versions/${version_id}" \
+              >/dev/null
+            echo "Deleted ${package} version_id=${version_id}"
+          }
+
+          for package in ${PACKAGES}; do
+            echo "---"
+            echo "Package: ${package}"
+
+            versions_json=$(list_versions "${package}" | jq -cs 'add | sort_by(.created_at) | reverse')
+
+            # Keep newest 10 versions that have any tag ending in -dev
+            keep_dev_ids=$(echo "${versions_json}" | jq -r --arg keep "${keep_count}" '
+              [ .[]
+                | select((.metadata.container.tags // []) | any(endswith("-dev")))
+                | .id
+              ][0:($keep|tonumber)]
+              | .[]
+            ' | sort -u)
+
+            # Keep newest 10 versions that have any tag ending in -play
+            keep_play_ids=$(echo "${versions_json}" | jq -r --arg keep "${keep_count}" '
+              [ .[]
+                | select((.metadata.container.tags // []) | any(endswith("-play")))
+                | .id
+              ][0:($keep|tonumber)]
+              | .[]
+            ' | sort -u)
+
+            keep_ids=$(printf "%s\n%s\n" "${keep_dev_ids}" "${keep_play_ids}" | awk 'NF' | sort -u)
+
+            echo "Keeping (dev):"
+            echo "${keep_dev_ids:-}" | awk 'NF {print "  - " $0}'
+            echo "Keeping (play):"
+            echo "${keep_play_ids:-}" | awk 'NF {print "  - " $0}'
+
+            delete_candidates=$(echo "${versions_json}" | jq -r --argjson keep 10 '
+              .[]
+              | select((.metadata.container.tags // []) | any(endswith("-dev") or endswith("-play")))
+              | "\(.created_at)\t\(.id)\t\((.metadata.container.tags // []) | join(","))"
+            ' | sort -r)
+
+            while IFS=$'\t' read -r created_at version_id tags; do
+              if [ -z "${version_id}" ]; then
+                continue
+              fi
+
+              if echo "${keep_ids}" | grep -qx "${version_id}"; then
+                continue
+              fi
+
+              echo "Deleting candidate: created_at=${created_at} id=${version_id} tags=${tags}"
+              delete_version "${package}" "${version_id}"
+            done <<< "${delete_candidates}"
+          done
