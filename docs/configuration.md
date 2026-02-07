@@ -41,6 +41,7 @@ See [Container images](images.md) for the published image references and tag sch
 
 - `KUBERNETES_SANDBOX_NAMESPACE` (optional): namespace where sandbox Pods are created (defaults to the server namespace).
 - `KUBERNETES_SANDBOX_CONTAINER_NAME` (default `sandbox`): container name inside sandbox Pods.
+- `KUBERNETES_SANDBOX_LABEL_PREFIX` (default `mcp-sandboxd.jeliasson.dev`): label key prefix (DNS subdomain) used for sandbox Pod labels.
 
 ## Tool description overrides
 
