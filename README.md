@@ -1,4 +1,4 @@
-![mcp-sandboxd logo](banner.png)
+![mcp-sandboxd logo](docs/assets/banner.png)
 
 <p align="center">
   <i align="center">Persistent, container-backed sandboxes over MCP (HTTP + SSE)</i>
@@ -15,7 +15,7 @@
 
 `mcp-sandboxd` is an MCP-compatible server that allows running arbitrary commands inside isolated sandboxes in Docker or Kubernetes.
 
-The core idea is simple: an `identifier` (e.g. a chat id) maps to a long-running sandbox environment reused across runs. This makes agent workflows feel like a "real machine", without exposing your host.
+The core idea is simple: an [identifier](docs/architecture.md#core-concepts) (e.g. a conversation id) maps to a long-running sandbox environment reused across runs. This makes agent workflows feel like a "_real machine_", without exposing your host.
 
 ## Use cases
 
@@ -126,6 +126,7 @@ Starts `mcp-sandboxd` on `http://localhost:8080/mcp`.
 - [Configuration](docs/configuration.md): Environment variables and defaults.
 - [Images](docs/images.md): Published container images and tags.
 - [Observability](docs/observability.md): Prometheus metrics.
+- [Security](security.md)
 - [Tools](docs/tools.md): Tool schemas and parameters.
 
 **Backend**

@@ -1,9 +1,18 @@
 # Images
 
-Published container images:
+This document describes images being built and published for `mcp-sandboxd` and `mcp-sandboxd-sandbox`.
 
-- **Server**: `ghcr.io/jeliasson/mcp-sandboxd`
-- **Sandbox**: `ghcr.io/jeliasson/mcp-sandboxd-sandbox`
+**Related docs**
+
+- [Configuration](configuration.md)
+- [Docker](docker.md)
+- [Kubernetes](kubernetes.md)
+- [Security](security.md)
+
+**Published container images**
+
+- **Server** `ghcr.io/jeliasson/mcp-sandboxd`
+- **Sandbox** `ghcr.io/jeliasson/mcp-sandboxd-sandbox`
 
 ## Tags
 
@@ -19,8 +28,3 @@ The CI publishes different tag flavors depending on pipeline.
 
 - **Playground**:
   - `:<short-sha>-play`
-
-Notes:
-- `:latest` is only published for releases.
-- `mcp-sandboxd` does not interpret tags specially; tags only select which image version you deploy.
-- `SANDBOX_IMAGE` decide which sandbox image to (build/)run.

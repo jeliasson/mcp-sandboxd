@@ -1,74 +1,100 @@
 # Configuration
 
-This document describes `mcp-sandboxd` environment variables.
+This document describes the environment variables for `mcp-sandboxd`. If you prefer, copy `.env.example` to `.env` and tweak.
 
-If you prefer, copy `.env.example` to `.env` and tweak.
+**Related docs**
 
-Related docs:
 - [Development](development.md)
 - [Docker](docker.md)
 - [Kubernetes](kubernetes.md)
 - [Images](images.md)
+- [Security](security.md)
 
 ## General
 
-- `PORT` (default `8080`): HTTP listen port.
-- `MCP_PATH` (default `/mcp`): MCP JSON-RPC endpoint path.
-- `ARTIFACTS_DIR` (default `./data/artifacts`): where extracted artifacts are stored and served from.
+| Key | Default | Description |
+| --- | ------- | ----------- |
+| `PORT` | `8080` | HTTP listen port. |
+| `MCP_PATH` | `/mcp` | MCP JSON-RPC endpoint path. |
+| `ARTIFACTS_DIR` | `./data/artifacts` | Where extracted artifacts are stored and served from. |
 
-## Backend selection
+## Sandbox
 
-- `SANDBOX_BACKEND` (default `docker`): `docker` or `kubernetes`.
-- `SANDBOX_IMAGE` (required): sandbox image reference (used by both backends).
+### Backend
 
-### Image tags
+| Key | Default | Description |
+| --- | ------- | ----------- |
+| `SANDBOX_BACKEND` | `docker` | `docker` or `kubernetes`. |
+| `SANDBOX_IMAGE` | Required | Sandbox image reference. |
 
-See [Container images](images.md) for the published image references and tag scheme.
+### Runtime isolation
 
-## Docker backend
+These settings apply to sandbox isolation for both the Docker and Kubernetes backends.
 
-- `DOCKER_HOST` (optional): docker/podman socket or daemon endpoint.
-- `AUTO_BUILD_SANDBOX_IMAGE` (default `true`): build sandbox image if missing.
-- `SANDBOX_DOCKERFILE_PATH` (default `docker/sandbox.Dockerfile`): Dockerfile to build sandbox image.
-- `SANDBOX_NETWORK_MODE` (default `bridge`)
-- `SANDBOX_NO_NEW_PRIVILEGES` (default `true`)
-- `SANDBOX_CAP_DROP` (default `ALL`)
-- `SANDBOX_CAP_ADD` (default `SETUID,SETGID,CHOWN,FOWNER,DAC_OVERRIDE`)
-- `SANDBOX_CAPS_STRICT` (default `true`)
-- `SANDBOX_CAPS_BYPASS_CHECK` (default `false`)
+| Key | Default | Description |
+| --- | ------- | ----------- |
+| `SANDBOX_NO_NEW_PRIVILEGES` | `true` | Enables `no-new-privileges` (Docker) / disables privilege escalation (Kubernetes). |
+| `SANDBOX_CAP_DROP` | `ALL` | Capabilities to drop. |
+| `SANDBOX_CAP_ADD` | `SETUID,SETGID,CHOWN,FOWNER,DAC_OVERRIDE` | Capabilities to add. |
+| `SANDBOX_CAPS_STRICT` | `true` | Strict capability checking. |
+| `SANDBOX_CAPS_BYPASS_CHECK` | `false` | Bypass capability checks. |
 
-## Kubernetes backend
+## Backend
 
-- `KUBERNETES_SANDBOX_NAMESPACE` (optional): namespace where sandbox Pods are created (defaults to the server namespace).
-- `KUBERNETES_SANDBOX_CONTAINER_NAME` (default `sandbox`): container name inside sandbox Pods.
-- `KUBERNETES_SANDBOX_LABEL_PREFIX` (default `mcp-sandboxd.jeliasson.dev`): label key prefix (DNS subdomain) used for sandbox Pod labels.
+### Docker
+
+| Key | Default | Description |
+| --- | ------- | ----------- |
+| `DOCKER_HOST` | Optional | Docker/Podman socket or daemon endpoint. |
+| `AUTO_BUILD_SANDBOX_IMAGE` | `true` | Build sandbox image if missing. |
+| `SANDBOX_DOCKERFILE_PATH` | `docker/sandbox.Dockerfile` | Dockerfile to build sandbox image. |
+| `SANDBOX_NETWORK_MODE` | `bridge` | Docker network mode. |
+
+### Kubernetes
+
+| Key | Default | Description |
+| --- | ------- | ----------- |
+| `KUBERNETES_SANDBOX_NAMESPACE` | \<Server namespace\> | Namespace where sandbox Pods are created. |
+| `KUBERNETES_SANDBOX_CONTAINER_NAME` | `sandbox` | Container name inside sandbox Pods. |
+| `KUBERNETES_SANDBOX_LABEL_PREFIX` | `mcp-sandboxd.jeliasson.dev` | Label key prefix (DNS subdomain) used for sandbox Pod labels. |
 
 ## Tool description overrides
 
-- `TOOL_DESC_OVERRIDES_ENABLED` (default `true`)
-- `TOOL_DESC_RUN_SANDBOX_OVERRIDE`, `TOOL_DESC_RUN_SANDBOX_APPEND`
-- `TOOL_DESC_DELETE_SANDBOX_OVERRIDE`, `TOOL_DESC_DELETE_SANDBOX_APPEND`
-- `TOOL_DESC_RESTART_SANDBOX_OVERRIDE`, `TOOL_DESC_RESTART_SANDBOX_APPEND`
+| Key | Default | Description |
+| --- | ------- | ----------- |
+| `TOOL_DESC_OVERRIDES_ENABLED` | `true` | Enable tool description overrides. |
+| `TOOL_DESC_RUN_SANDBOX_OVERRIDE` | `null` | Override for `run_sandbox` description. |
+| `TOOL_DESC_RUN_SANDBOX_APPEND` | `null` | Text to append to `run_sandbox` description. |
+| `TOOL_DESC_DELETE_SANDBOX_OVERRIDE` | `null` | Override for `delete_sandbox` description. |
+| `TOOL_DESC_DELETE_SANDBOX_APPEND` | `null` | Text to append to `delete_sandbox` description. |
+| `TOOL_DESC_RESTART_SANDBOX_OVERRIDE` | `null` | Override for `restart_sandbox` description. |
+| `TOOL_DESC_RESTART_SANDBOX_APPEND` | `null` | Text to append to `restart_sandbox` description. |
 
 ## Limits
 
-- `DEFAULT_TTL_SECONDS` (default `3600`)
-- `MAX_TTL_SECONDS` (default `604800`)
-- `REAPER_INTERVAL_MS` (default `5000`)
-- `DEFAULT_CPU_CORES` (default `1`)
-- `DEFAULT_MEMORY_MB` (default `1024`)
-- `DEFAULT_PIDS` (default `256`)
-- `DEFAULT_COMMAND_TIMEOUT_MS` (default `120000`)
-- `DEFAULT_STDOUT_MAX_BYTES` (default `1048576`)
-- `DEFAULT_STDERR_MAX_BYTES` (default `1048576`)
-- `MAX_RUNS` (default `10000`)
+| Key | Default | Description |
+| --- | ------- | ----------- |
+| `DEFAULT_CPU_CORES` | `1` | Default CPU cores allocated to sandboxes. |
+| `DEFAULT_MEMORY_MB` | `1024` | Default memory in MB allocated to sandboxes. |
+| `DEFAULT_PIDS` | `256` | Default PIDs limit for sandboxes. |
+| `DEFAULT_COMMAND_TIMEOUT_MS` | `120000` | Default timeout in milliseconds for commands. |
+| `DEFAULT_STDOUT_MAX_BYTES` | `1048576` | Maximum stdout size in bytes. |
+| `DEFAULT_STDERR_MAX_BYTES` | `1048576` | Maximum stderr size in bytes. |
+| `DEFAULT_TTL_SECONDS` | `3600` | Default Time-To-Live for sandboxes. |
+| `MAX_TTL_SECONDS` | `604800` | Maximum Time-To-Live for sandboxes. |
+| `MAX_RUNS` | `10000` | Maximum number of concurrent runs. |
+| `REAPER_INTERVAL_MS` | `5000` | Interval for sandbox reaper to run. |
 
 ## Logging
 
-- `LOG_HTTP_REQUESTS` (default `false`)
-- `LOG_MCP_REQUESTS` (default `false`)
-- `LOG_TOOLCALLS` (default `false`)
+| Key | Default | Description |
+| --- | ------- | ----------- |
+| `LOG_HTTP_REQUESTS` | `false` | Log all HTTP requests. |
+| `LOG_MCP_REQUESTS` | `false` | Log all MCP requests. |
+| `LOG_TOOLCALLS` | `false` | Log all tool calls. |
 
 ## CORS
 
-- `CORS_ALLOW_ORIGINS` (optional, comma-separated)
+| Key | Default | Description |
+| --- | ------- | ----------- |
+| `CORS_ALLOW_ORIGINS` | Optional | Comma-separated list of allowed CORS origins. |

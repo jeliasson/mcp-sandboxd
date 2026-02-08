@@ -1,5 +1,12 @@
 # Development
 
+This document describes a high-level overview of the development and contribution cycle for `mcp-sandboxd`.
+
+**Related docs**
+
+- [Architecture](architecture.md)
+- [Configuration](configuration.md)
+
 ## Local quickstart
 
 Prereqs:
@@ -13,14 +20,21 @@ cp .env.example .env
 make dev
 ```
 
-The server listens on `PORT` (default `8080`) and serves MCP JSON-RPC on `MCP_PATH` (default `/mcp`). See [Configuration](configuration.md) for all environment variables, and [Docker](docker.md) / [Kubernetes](kubernetes.md) for deployment-specific notes.
+The server listens on `PORT` (default `8080`) and serves MCP JSON-RPC on `MCP_PATH` (default `/mcp`).
 
-## Common workflows
+See [Configuration](configuration.md) for all environment variables.
 
-- Rebuild sandbox image: `make docker-build-sandbox`
-- Run unit tests: `make test`
-- Run server once (no file watch): `make run`
-- Run a second dev instance: `make dev--agent` (uses `AGENT_PORT`)
+## Contribution
+
+0. Open Issue describing what you want
+1. Build sandbox image: `make docker-build-sandbox`
+2. Run server once: `make run`
+3. Implement your changes
+4. Make MCP request
+5. Validate result
+6. Run unit tests: `make test`
+7. (Repeat Step 1-6...)
+8. Open Pull Request and reference the issue
 
 ## Make
 

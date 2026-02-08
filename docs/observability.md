@@ -2,10 +2,17 @@
 
 This document describes the built-in Prometheus metrics exposed by `mcp-sandboxd`.
 
-Related docs:
+**Related docs**
+
 - [Architecture](architecture.md)
 - [Configuration](configuration.md)
 - [Kubernetes](kubernetes.md)
+- [Security](security.md)
+
+## Security notes
+
+- Treat `/metrics` as operational data; expose it only to your monitoring network.
+- If you publish `mcp-sandboxd` behind an Ingress, consider restricting `/metrics` with network policy and/or auth at the ingress layer.
 
 ## Prometheus metrics
 
@@ -48,9 +55,9 @@ Histogram:
 curl -s http://localhost:8080/metrics | head
 ```
 
-## Prometheus scrape example
+## Prometheus scraping
 
-### Minimal scrape config
+### Minimal example
 
 ```yaml
 scrape_configs:
@@ -58,20 +65,9 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - localhost:8080
+          - mcp-sandboxd.mcp-sandboxd.svc.cluster.local:8080
 ```
 
-### Kubernetes (Service)
+### Operator
 
-If you expose `mcp-sandboxd` as a Service, configure Prometheus to scrape that Service DNS name.
-
-Example target:
-
-- `mcp-sandboxd.mcp-sandboxd.svc.cluster.local:8080`
-
-If you use the Prometheus Operator, consider using a `ServiceMonitor`.
-
-## Security notes
-
-- Treat `/metrics` as operational data; expose it only to your monitoring network.
-- If you publish `mcp-sandboxd` behind an Ingress, consider restricting `/metrics` with network policy and/or auth at the ingress layer.
+If you use the Prometheus Operator, consider using a [`ServiceMonitor`](https://prometheus-operator.dev/docs/developer/getting-started/#using-servicemonitors).
