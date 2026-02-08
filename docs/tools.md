@@ -2,18 +2,23 @@
 
 This document describes the MCP tools exposed by `mcp-sandboxd` and the JSON schemas returned by `tools/list`.
 
-Source of truth: `internal/mcp/tools.go`.
+**Related docs**
+
+- [Configuration](configuration.md)
+- [Observability](observability.md)
+- [Security](security.md)
 
 ## `run_sandbox`
 
 Run one or more commands in a sandbox keyed by `identifier`.
 
-Notes:
+**Notes**
+
 - `identifier` must match `^[a-zA-Z0-9_-]{1,36}$`.
 - Each command should provide exactly one of `shell` (string) or `argv` (string array). (This constraint is described in the tool description but not enforced by the JSON schema.)
 - `env` supports either an object map (`{"KEY":"VALUE"}`) or an array of `KEY=VALUE` strings.
 
-### inputSchema
+### Input Schema
 
 ```json
 {
@@ -71,7 +76,7 @@ Notes:
 
 Delete a sandbox environment.
 
-### inputSchema
+### Input Schema
 
 ```json
 {
@@ -87,7 +92,7 @@ Delete a sandbox environment.
 
 Recreate a fresh sandbox for an identifier.
 
-### inputSchema
+### Input Schema
 
 ```json
 {

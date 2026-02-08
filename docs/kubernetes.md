@@ -2,15 +2,18 @@
 
 The Kubernetes backend manages one long-running sandbox Pod per `identifier`.
 
-`mcp-sandboxd` supports two Kubernetes deployment patterns:
+**Related docs**
 
-- [Kubernetes Pod](#kubernetes-pod): the server schedules sandbox Pods via the Kubernetes API.
-- [DinD sidecar](#dind-sidecar): the server talks to a Docker daemon provided by a privileged `docker:dind` sidecar.
-
-Related docs:
 - [Configuration](configuration.md)
 - [Images](images.md)
 - [Docker](docker.md)
+- [Observability](observability.md)
+- [Security](security.md)
+
+`mcp-sandboxd` supports two Kubernetes deployment patterns:
+
+- [Kubernetes Pod](#kubernetes-pod) (**recommended**): the server schedules sandbox Pods via the Kubernetes API.
+- [DinD sidecar](#dind-sidecar): the server talks to a Docker daemon provided by a privileged `docker:dind` sidecar.
 
 ## Kubernetes Pod
 
@@ -18,10 +21,7 @@ In this mode, `mcp-sandboxd` schedules sandbox Pods via the Kubernetes API.
 
 - Set `SANDBOX_BACKEND=kubernetes`.
 - Set `SANDBOX_IMAGE` to the sandbox image you want to run.
-- The server uses its ServiceAccount credentials to create Pods.
-- Each `identifier` maps to one long-running sandbox Pod (persistent for the chat/session).
-
-Artifacts behave the same as other backends: write files under `/artifacts` in the sandbox, then download them from the server via `GET /artifacts/...`.
+- Uses `ServiceAccount` credentials to create Pods.
 
 ```mermaid
 flowchart LR
@@ -34,13 +34,21 @@ flowchart LR
 
 At minimum, the ServiceAccount needs permissions to manage Pods in the sandbox namespace.
 
-### Example (ServiceAccount + Role + Deployment)
+### Example deployment
 
 ```yaml
+---
+# Sandboxes namespace
 apiVersion: v1
 kind: Namespace
 metadata:
   name: mcp-sandboxd-sandboxes
+---
+# Sandboxd namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp-sandboxd
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -84,19 +92,16 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mcp-sandboxd
+      app.kubernetes.io/name: sandboxd
   template:
     metadata:
       labels:
-        app: mcp-sandboxd
+        app.kubernetes.io/name: sandboxd
     spec:
       serviceAccountName: mcp-sandboxd
       containers:
         - name: server
           image: ghcr.io/jeliasson/mcp-sandboxd:latest
-          ports:
-            - containerPort: 8080
-              name: http
           env:
             - name: PORT
               value: "8080"
@@ -110,6 +115,37 @@ spec:
               value: ghcr.io/jeliasson/mcp-sandboxd-sandbox:latest
             - name: AUTO_BUILD_SANDBOX_IMAGE
               value: "false"
+          ports:
+            - containerPort: 8080
+              name: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            seccompProfile: { type: RuntimeDefault }
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "5m"
+              memory: "32Mi"
+            limits:
+              cpu: "50m"
+              memory: "64Mi"
+          readinessProbe:
+            httpGet:
+              path: /mcp
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /mcp
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 6
 ---
 apiVersion: v1
 kind: Service
@@ -118,7 +154,7 @@ metadata:
   namespace: mcp-sandboxd
 spec:
   selector:
-    app: mcp-sandboxd
+    app.kubernetes.io/name: sandboxd
   ports:
     - name: http
       port: 8080
@@ -128,19 +164,24 @@ spec:
 ### Hardening checklist
 
 - Use a dedicated namespace for sandboxes.
-- Apply a default-deny egress NetworkPolicy for the sandbox namespace.
-- Use ResourceQuota/LimitRange to cap CPU/memory/ephemeral storage.
-- Tune Linux capabilities via `SANDBOX_CAP_DROP` / `SANDBOX_CAP_ADD`.
+- Apply a default-deny egress `NetworkPolicy` for the sandbox namespace.
+- Use [`ResourceQuota`](https://kubernetes.io/docs/concepts/policy/resource-quotas/) and [`LimitRange`](https://kubernetes.io/docs/concepts/policy/limit-range/) to cap CPU, memory and ephemeral storage.
+- Tune Linux capabilities via [`SANDBOX_CAP_DROP`](configuration.md#SANDBOX_CAP_DROP) / [`SANDBOX_CAP_ADD`](configuration.md#SANDBOX_CAP_ADD).
 
 ## DinD sidecar
 
-Most clusters run `containerd` on nodes, so there is no Docker daemon available by default. This pattern provides a **Docker daemon** via DinD.
+In this mode, `mcp-sandboxd` schedules sandbox containers via [Docker-in-Docker](https://hub.docker.com/_/docker#what-is-docker-in-docker) (DinD).
 
-Security notes:
-- DinD generally requires `securityContext.privileged: true`.
-- Treat DinD as a high-trust component and isolate it.
+### Security notes
+
+- DinD generally requires `securityContext.privileged: true`. Treat this as a high-trust component and isolate it (namespace + node pool + egress controls) if you execute untrusted code.
+
+### Example
+
+See [Kubernetes Pod](#kubernetes-pod)'s example for a more complete example. Below just illustrates DinD specific.
 
 ```yaml
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -150,41 +191,30 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mcp-sandboxd
+      app.kubernetes.io/name: sandboxd
   template:
     metadata:
       labels:
-        app: mcp-sandboxd
+        app.kubernetes.io/name: sandboxd
     spec:
       containers:
         - name: server
           image: ghcr.io/jeliasson/mcp-sandboxd:latest
-          ports:
-            - containerPort: 8080
-              name: http
           env:
-            - name: PORT
-              value: "8080"
-            - name: MCP_PATH
-              value: "/mcp"
-            - name: SANDBOX_BACKEND
-              value: "docker"
-            - name: SANDBOX_IMAGE
-              value: ghcr.io/jeliasson/mcp-sandboxd-sandbox:latest
+            # [...]
             - name: DOCKER_HOST
               value: tcp://localhost:2375
             - name: DOCKER_TLS_VERIFY
               value: "0"
-            - name: AUTO_BUILD_SANDBOX_IMAGE
-              value: "false"
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 10001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+
+          ports:
+            - containerPort: 8080
+              name: http
+
+          # [...]
 
         - name: dind
-          image: docker:27-dind
+          image: docker:29-dind
           args:
             - --host=tcp://0.0.0.0:2375
             - --host=unix:///var/run/docker.sock
@@ -194,21 +224,7 @@ spec:
           volumeMounts:
             - name: dind-storage
               mountPath: /var/lib/docker
-
       volumes:
         - name: dind-storage
           emptyDir: {}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mcp-sandboxd
-  namespace: mcp-sandboxd
-spec:
-  selector:
-    app: mcp-sandboxd
-  ports:
-    - name: http
-      port: 8080
-      targetPort: http
 ```
