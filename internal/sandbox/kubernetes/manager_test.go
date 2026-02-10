@@ -124,6 +124,36 @@ func TestManagerPodSecurityContextMirrorsSandboxConfig(t *testing.T) {
 	}
 }
 
+func TestPodReadyForExec(t *testing.T) {
+	p := &corev1.Pod{Status: corev1.PodStatus{Phase: corev1.PodRunning, ContainerStatuses: []corev1.ContainerStatus{{
+		Name:  "sandbox",
+		Ready: true,
+		State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+	}}}}
+	if ok, why := podReadyForExec(p, "sandbox"); !ok {
+		t.Fatalf("expected ready, got: %s", why)
+	}
+
+	p2 := &corev1.Pod{Status: corev1.PodStatus{Phase: corev1.PodRunning, ContainerStatuses: []corev1.ContainerStatus{{
+		Name:  "sandbox",
+		Ready: false,
+		State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+	}}}}
+	if ok, _ := podReadyForExec(p2, "sandbox"); ok {
+		t.Fatalf("expected not ready")
+	}
+
+	p3 := &corev1.Pod{Status: corev1.PodStatus{Phase: corev1.PodPending}}
+	if ok, _ := podReadyForExec(p3, "sandbox"); ok {
+		t.Fatalf("expected not ready")
+	}
+
+	p4 := &corev1.Pod{Status: corev1.PodStatus{Phase: corev1.PodRunning}}
+	if ok, why := podReadyForExec(p4, "sandbox"); ok || why == "" {
+		t.Fatalf("expected not ready with reason, got ok=%t reason=%q", ok, why)
+	}
+}
+
 func TestManagerPolicyMismatchRecreates(t *testing.T) {
 	cs := fake.NewSimpleClientset()
 

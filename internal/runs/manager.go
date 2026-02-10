@@ -210,6 +210,43 @@ func (m *Manager) executeRun(runID string, args RunSandboxArgs, sbx *sandbox.San
 	}
 	defer release()
 
+	// Ensure the sandbox is actually ready for exec.
+	{
+		readyCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		sbxReady, err := m.sandboxes.Ensure(readyCtx, args.Identifier, args.Options.TTLSeconds)
+		cancel()
+		if err != nil {
+			m.mu.Lock()
+			run := m.runs[runID]
+			m.mu.Unlock()
+			if run != nil {
+				// Run might have been evicted; best-effort fail.
+				ended := time.Now().UTC()
+				m.mu.Lock()
+				run.State = StateFailed
+				run.EndedAt = ended
+				run.Error = err.Error()
+				m.mu.Unlock()
+				m.metrics.RunsTotal.WithLabelValues(string(StateFailed)).Inc()
+				b.Publish("run_failed", map[string]any{
+					"run_id":   runID,
+					"ended_at": ended.Format(time.RFC3339Nano),
+					"error":    err.Error(),
+				})
+				close(run.Done)
+			}
+			return
+		}
+		sbx = sbxReady
+		m.mu.Lock()
+		run := m.runs[runID]
+		if run != nil {
+			run.SandboxContainerID = sbx.ContainerID
+			run.SandboxName = sbx.Name
+		}
+		m.mu.Unlock()
+	}
+
 	now := time.Now().UTC()
 
 	m.mu.Lock()

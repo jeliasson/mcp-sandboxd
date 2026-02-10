@@ -195,24 +195,61 @@ func (m *Manager) extend(identifier string, ttlSeconds int) {
 	m.mu.Unlock()
 }
 
+func podReadyForExec(p *corev1.Pod, containerName string) (ready bool, reason string) {
+	if p == nil {
+		return false, "pod is nil"
+	}
+	if p.Status.Phase != corev1.PodRunning {
+		return false, fmt.Sprintf("phase=%s", p.Status.Phase)
+	}
+
+	for _, cs := range p.Status.ContainerStatuses {
+		if cs.Name != containerName {
+			continue
+		}
+		if cs.State.Waiting != nil {
+			reason = cs.State.Waiting.Reason
+			if strings.TrimSpace(reason) == "" {
+				reason = "container waiting"
+			}
+			return false, reason
+		}
+		if cs.State.Running == nil {
+			return false, "container not running"
+		}
+		if !cs.Ready {
+			return false, "container not ready"
+		}
+		return true, ""
+	}
+
+	return false, "container status missing"
+}
+
 func (m *Manager) ensureRunning(ctx context.Context, podName string) error {
 	deadline := time.Now().Add(30 * time.Second)
+	containerName := strings.TrimSpace(m.cfg.KubernetesSandboxContainerName)
+	if containerName == "" {
+		containerName = "sandbox"
+	}
+
 	for {
 		p, err := m.client.CoreV1().Pods(m.namespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
+
 		switch p.Status.Phase {
-		case corev1.PodRunning:
-			return nil
 		case corev1.PodFailed, corev1.PodSucceeded:
 			return fmt.Errorf("pod not runnable: %s", p.Status.Phase)
-		default:
-			// Pending/Unknown: keep waiting a bit.
 		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("pod not running after timeout: %s", p.Status.Phase)
+
+		if ok, why := podReadyForExec(p, containerName); ok {
+			return nil
+		} else if time.Now().After(deadline) {
+			return fmt.Errorf("pod not ready after timeout: %s (%s)", p.Status.Phase, why)
 		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
