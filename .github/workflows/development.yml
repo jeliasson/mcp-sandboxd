@@ -19,5 +19,6 @@ jobs:
       packages: write
     uses: ./.github/workflows/_build.yml
     with:
+      environment: development
       tags: |
         type=raw,value=${{ needs.test.outputs.short_sha }}-dev
