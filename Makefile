@@ -26,7 +26,7 @@ NET ?= mcp-sandboxd-net
 CGO_ENABLED ?= 0
 GO := env CGO_ENABLED=$(CGO_ENABLED) go
 
-.PHONY: build run dev dev--agent docker-build docker-run docker-build-sandbox docker-run-sandbox fmt test test-watch clean
+.PHONY: build run dev dev--agent docker-build docker-run docker-build-sandbox docker-run-sandbox deps-bump fmt test test-watch clean
 
 build:
 	@mkdir -p bin
@@ -82,6 +82,10 @@ docker-run: docker-build
 		-e ARTIFACTS_DIR=/data/artifacts \
 		-v "$$PWD/data/artifacts:/data/artifacts" \
 		$(SERVER_IMAGE)
+
+deps-bump:
+	$(GO) get -u ./...
+	$(GO) mod tidy
 
 fmt:
 	$(GO) fmt ./...
