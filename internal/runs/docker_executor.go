@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
 
 	"github.com/jeliasson/mcp-sandboxd/internal/client/docker"
@@ -30,7 +30,7 @@ func (e *DockerExecutor) Exec(ctx context.Context, sandboxID string, params Exec
 		env = append(env, k+"="+v)
 	}
 
-	execCfg := types.ExecConfig{
+	execCfg := container.ExecOptions{
 		AttachStdout: true,
 		AttachStderr: true,
 		WorkingDir:   params.Cwd,
@@ -44,7 +44,7 @@ func (e *DockerExecutor) Exec(ctx context.Context, sandboxID string, params Exec
 		return 0, err
 	}
 
-	attach, err := e.docker.Raw().ContainerExecAttach(ctx, execResp.ID, types.ExecStartCheck{})
+	attach, err := e.docker.Raw().ContainerExecAttach(ctx, execResp.ID, container.ExecAttachOptions{})
 	if err != nil {
 		return 0, err
 	}
