@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/fsnotify/fsnotify v1.10.1
-	github.com/go-chi/chi/v5 v5.3.2
+	github.com/go-chi/chi/v5 v5.4.0
 	github.com/go-chi/cors v1.2.2
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.24.1
